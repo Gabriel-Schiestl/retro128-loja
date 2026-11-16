@@ -51,6 +51,27 @@ jobs:
       - name: Configurar Pages
         uses: actions/configure-pages@v5
 
+      # Ação corretiva do post-mortem (Problema 1): não publicar uma versão
+      # cuja configuração aponte para capas que não existem no repositório.
+      - name: Validar a release (capas do catálogo existem)
+        run: |
+          python3 - <<'PY'
+          import json, os, sys
+          config = json.load(open("config/app-config.json", encoding="utf-8"))
+          catalogo = json.load(open(config["catalogoUrl"], encoding="utf-8"))
+          pasta = config["pastaCapas"]
+          faltando = [pasta + j["capa"] for j in catalogo["jogos"]
+                      if not os.path.isfile(pasta + j["capa"])]
+          print(f"Versão {config['versao']}: pastaCapas = {pasta}")
+          print(f"{len(catalogo['jogos'])} jogos no catálogo, {len(faltando)} capa(s) faltando")
+          for caminho in faltando:
+              print(f"::error file=config/app-config.json::Capa não encontrada: {caminho}")
+          if faltando:
+              print("Deploy BLOQUEADO: a release aponta para capas que não existem.")
+              sys.exit(1)
+          print("Validação OK: todas as capas existem.")
+          PY
+
       - name: Empacotar o site
         uses: actions/upload-pages-artifact@v3
         with:
